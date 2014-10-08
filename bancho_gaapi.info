@@ -1,0 +1,20 @@
+name = bancho_gaapi
+description = Google Analytics Data API utilizer
+package = "bancho"
+core = 7.x
+
+version = "7.x-1.2"
+datestamp = "1407735012"
+
+;dependencies[] = bancho_common_functions
+
+configure = admin/config/bancho/bancho_gaapi
+
+files[] = bancho_gaapi.admin.inc
+files[] = bancho_gaapi.rankings.inc
+files[] = bancho_gaapi.statistics.inc
+files[] = views/views_handler_field_bancho_gaapi_rates.inc
+files[] = views/views_handler_filter_gaapi_above_average.inc
+files[] = views/views_handler_filter_sbm_cache_service.inc
+files[] = views/views_plugin_row_bancho_gaapi_ranking.inc
+files[] = views/views_plugin_style_bancho_gaapi_ranking.inc

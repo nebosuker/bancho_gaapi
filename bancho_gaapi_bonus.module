@@ -1,0 +1,56 @@
+<?php
+
+
+/**
+ * Display help and module information
+ * @param section which section of the site we're displaying help
+ * @return help text for section
+ */
+function bancho_gaapi_bonus_help($path, $arg) {
+  switch ($path) {
+    case 'admin/modules#description':
+      return 'Google Analyticsデータのランキングアルゴリズムbonus';
+      break;
+  }
+}
+
+
+
+/**
+ * Implements hook_gaapi_ranking
+().
+ *@param $action
+ * list|update
+ *@param $name
+ * name of the function
+ *@param $option
+ * which score to update
+ *@return
+ *
+ */
+function bancho_gaapi_bonus_gaapi_ranking($action = 'list', $name = FALSE, $option = FALSE) {
+  module_load_include('inc', 'bancho_gaapi_bonus', 'bancho_gaapi_bonus');
+  return bancho_gaapi_bonus_gaapi_ranking_main($action, $name, $option);
+}
+
+
+
+/**
+ * Implements hook_form_alter
+().
+ */
+function bancho_gaapi_bonus_form_alter(&$form, &$form_state, $form_id) {
+  if ($form_id != 'bancho_gaapi_settings_account') {
+    return;
+  }
+  module_load_include('inc', 'bancho_gaapi_bonus', 'bancho_gaapi_bonus');
+  bancho_gaapi_bonus_form_alter_main($form, $form_state, $form_id);
+}
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
+function bancho_gaapi_bonus_form_alter_submit($form, &$form_state) {
+  module_load_include('inc', 'bancho_gaapi_bonus', 'bancho_gaapi_bonus');
+  bancho_gaapi_bonus_form_alter_submit_main($form, $form_state);
+}

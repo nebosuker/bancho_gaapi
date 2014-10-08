@@ -1,0 +1,35 @@
+<?php
+// 日本語
+
+/**
+ * Display help and module information
+ * @param section which section of the site we're displaying help
+ * @return help text for section
+ */
+function bancho_gaapi_tokasiki_help($path, $arg) {
+  switch ($path) {
+    case 'admin/modules#description':
+      return 'Google Analyticsのデータを自動取得してランキング記事を作成（tokasiki用）';
+      break;
+  }
+}
+
+/**
+ * Implements hook_menu().().
+ */
+function bancho_gaapi_tokasiki_menu() {
+
+  $items = array();
+
+  $items['admin/reports/bancho_gaapi/tokasiki'] = array(
+    'title' => 'Yahoo!リスティング向けアクセス情報の取得',
+    'page callback' => 'bancho_gaapi_tokasiki',
+    'file' => 'bancho_gaapi_tokasiki.inc',
+    'access arguments' => array('access bancho_gaapi'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
+}
+
+

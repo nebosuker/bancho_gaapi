@@ -1,0 +1,85 @@
+2012-06-06
+認証をOAuth 2.0に切り換えたのでopenssl系のファイルを一掃
+Core Reporting API 3.0とManagement API 3.0に対応
+3.0系APIの対応にともない、取得データがXMLではなくJSONになったので、SAX的処理ではなく一括読み込みにした
+
+
+2010-05-22 0.9.17
+gaapi_core.inc：APIデータ取得時にgzipを使えるようにした
+watchdogのtypeをbanchoからbancho_gaapiに変更
+
+2010-03-16 0.9.16
+テーブル修正：total_visits、*_visits追加
+gaapi_core.inc：visitsもとるようにした
+bancho_gaapi.module：visitsとPV/visitsをノードに表示するようにしたけど、データが怪しい（ga:entrancesとga:visitsがほぼ同じ）なので、表示するのは中止
+
+2010-03-16 0.9.15
+テーブル修正：total_links_g追加（被リンク数Google）
+アップデートスクリプトにtotal_links_gフィールドを追加
+
+設定フォームからGoogle Webmaster toolの被リンクCSVを読み込むように
+
+2010-03-16 0.9.14
+アップデートスクリプトでtotal_deltaの追加部分が間違っていたのを修正
+*_installにもちゃんとtotal_deltaを追加
+
+2010-03-16 0.9.13
+テーブル修正：total_delta追加
+データ更新時にtotal_deltaを更新するように変更
+statisticsでページネーションを有効に
+
+2010-02-01 0.9.12
+期間を長くとったtotal_pv系が少なく表示されるGAの不具合に対応するために
+latest系の数値がtotalよりも多ければ、そちらをtotalとして扱うようにした
+
+2010-01-28 0.9.11
+コンテンツ非公開状態でGAのビーコンが飛ばないように
+ページテンプレートで対応したことに併せて
+GAデータがない状態でノードのlinksにGAページへのリンクだけ出すようにした。
+
+2010-01-11	0.9.10
+暫定的にsbm_cache関連のビューを作れるようにした（後日別モジュール化すること）
+
+2009-12-31	0.9.9
+※実行速度・実行時間を改善するための修正その他bugfix
+※variableのフォーマットを変えたため、バージョンアップには手動処理が必要
+・bancho_gaapi関連
+（bancho_gaapi.module、bancho_gaapi.install、gaapi_core.inc、setting_form.inc）
+	data APIで複数ページに渡って出現していたノードの値が間違って保存されていたのを修正
+	ノードのcreatedをまとめて取得してstaticキャッシュ
+	{bancho_gaapi}の既存データをまとめて取得してstaticキャッシュ
+		DB更新を1か所にまとめた
+	total/latest系ではGAの最新データがない場合は処理しないように変更
+	drupal_get_normal_pathが時間かかってるので処理削減
+		{url_alias}のデータをまとめて取得してstaticキャッシュ
+		drupal_get_normal_pathをスキップできる部分は可能な限りスキップ
+	何万回も呼ばれる関数の一部引数を参照渡しに
+	variables保存データをまとめてDBレコード数削減
+	curlじゃなくてdrupal_http_requestに変更
+	bancho_gaapi_num_entries / bancho_gaapi_num_db_entries / bancho_gaapi_options_doneをbancho_profilerにまとめた
+・bancho_gaapi_ranking_webtan
+	bancho_gaapiの変更に併せて修正
+
+2009-08-09
+・bancho_gaapi
+	views関連のフィールドがちゃんと処理されていなかったのを処理
+	views関連のフィールド名表示をわかりやすくした
+・bancho_gaapi_bonus
+	直帰率/離脱率ベースのランキングを追加
+	直帰率/離脱率ベースのランキング（カスタマイズ可）を追加
+
+2009-08-10
+・bancho_gaapi
+	ランキングの選択肢を増やした
+	ランキングの選択によって設定フォームをform_alterして追加設定できるようにした
+
+
+2009-10-15
+・statistics.inc
+	フローメディア向け解析画面を作った
+
+2009-11-14
+・statistics.inc
+	15日目以降増加数の計算がおかしくならないように修正
+・gaapi_core.inc
+	7/14/30/90日目pvに、それぞれの日数経過していない場合は累計pvを突っ込んでおくように修正

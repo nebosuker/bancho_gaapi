@@ -1,0 +1,60 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" 
+"http://www.w3.org/TR/1999/REC-html401-19991224/loose.dtd">
+<html lang="ja">
+<head>
+<meta http-equiv="content-type" content="text/html;charset=UTF-8">
+<title></title>
+</head>
+<body>
+
+<ol>
+<li>
+<p>access <a href="https://code.google.com/apis/console/?api=analytics">Google API Console</a> (this link is one that specifying to use Analytics API).</p>
+<p>You may need to create new project through lisence agreement page.</p>
+</li>
+
+<li>
+<p>click "API Access" link at the left side menu to show API Access page.</p>
+<img src="api_console_1.png">
+</li>
+
+<li>
+<p>click "Create an OAuth 2.0 client ID..." button (the interface may differ if you have already created ID for this project). </p>
+</li>
+
+<li>
+<p>On "Branding Information" dialog box, type some name into "Product name" textbox and click "Next" button. Yo don't have to fill other fields (you may if you want to).</p>
+<img src="api_console_2.png">
+</li>
+
+<li>
+<p>On "Client ID Settings" dialog box, </p>
+<ul>
+<li>select "Web application" for "Application type".<br>
+<img src="api_console_3.png">
+</li>
+<li>Click "more options" link on "Your site or hostname" title.<br>
+<img src="api_console_4.png">
+</li>
+<li>copy and paste url below to "Authorized Redirect URIs":<br>
+<textarea id="uris" rows="3" style="width: 100%"></textarea>
+<script>
+var s = '';
+document.getElementById('uris').value = location.protocol + '//' + location.hostname+ '/admin/config/bancho/bancho_gaapi/oauth2callback';
+</script>
+</li>
+<li>copy and paste url below to "Authorized JavaScript Origins":<br>
+<textarea id="origins" rows="3" style="width: 100%"></textarea>
+<script>
+document.getElementById('origins').value = 'http://'+location.hostname+"\n"+'https://'+location.hostname;
+</script>
+</li>
+</ul>
+<p>and click "Create cliend ID" button.</p>
+</li>
+</ol>
+
+<p><a href="https://accounts.google.com/b/0/IssuedAuthSubTokens?hl=ja">click here to revoke authorization</a></p>
+
+</body>
+</html>

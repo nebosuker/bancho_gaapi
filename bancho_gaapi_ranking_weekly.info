@@ -1,0 +1,13 @@
+name = bancho_gaapi_ranking_weekly
+description = Google Analytics Data API weekly ranking node creator
+package = "bancho"
+core = 7.x
+
+version = "7.x-1.0"
+datestamp = "1399453395"
+
+configure = admin/config/bancho/bancho_common
+
+dependencies[] = bancho_gaapi
+dependencies[] = bancho_common
+dependencies[] = bancho_sbm

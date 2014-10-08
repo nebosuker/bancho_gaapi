@@ -1,0 +1,9 @@
+name = bancho_gaapi_bonus
+description = Google Analytics Data API bonus ranking algorythms
+package = "bancho"
+core = 7.x
+
+version = "7.x-1.0"
+datestamp = "1399453395"
+
+dependencies[] = bancho_gaapi

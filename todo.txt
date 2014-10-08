@@ -1,0 +1,61 @@
+
+http://analytics.blogspot.com/2011/12/introducing-google-analytics-core.html
+http://code.google.com/apis/analytics/docs/gdata/home.html
+
+・OAuth対応
+PECLのOAuthを使うか、abraham http://github.com/abraham/twitteroauth のOAuth.phpを使うか
+
+・パラメータ設定とかentry処理コールバック関数とか指定して使える汎用化
+
+impressrd	Web担当者Forum	820928	ga:820928
+
+/*
+
+http://code.google.com/intl/ja/apis/analytics/docs/gdata/gdataDeveloperGuide.html
+http://code.google.com/intl/ja/apis/analytics/docs/gdata/gdataReferenceDimensionsMetrics.html
+http://code.google.com/intl/ja/apis/analytics/docs/gdata/gdataReference.html
+
+http://groups.google.com/group/google-analytics-data-export-api/browse_thread/thread/1dda071a100f24ff#
+
+# The default number of entries returned from a request is 1,000.
+# The maximum number of entries returned from a request is 10,000. For example, you can use the max-results parameter to request up to 10,000 rows. Use the start-index along with the max-results parameter to page through larger blocks of data.
+# Invalid query parameters, such as 0 for start-index will result in a 400 Bad Request response from the server. - start-indexは1ベース
+
+
+Quota Policy
+
+Before using this release of the Google Analytics Data Export API for your applications, be aware of our quota policy.
+
+The Google Analytics Data API accepts millions of operations. To protect the system from receiving more operations than it can handle, and to ensure an equitable distribution of system resources, it's necessary to employ a quota system. Our policies are subject to change, but currently they are as follows:
+
+    * The quota applies to a single web property
+    * 10,000 requests per 24 hours
+    * 100 requests in any given 10-second period
+    * A query is also limited to pagination limits of 10,000 entries per feed, with a default response of 1,000 entries
+
+The Data Export API uses the web property ID as its reference for a web property, not an individual profile ID. This means that your application can only make 10k requests per day for all the profile IDs that track the same web property by ID. For example, suppose your website uses UA-1234-1 as its ID: that ID has a quota assigned to it.
+
+    Every single profile that tracks the website draws from that same quota pool.
+
+Now suppose profiles 1 and 2 track this site. On Monday, profile 1 could draw all the quota, and on Tuesday, profile 2 could draw all the quota. On Wednesday, the quota allowance could be split between the two profiles. Any combination is allowable, because the maximum allowance is set to the web property itself, not the particular profile. For more information about web properties and web property IDs, see "Web Property" in the Accounts and Profiles document.
+
+When an account has exceeded its quota, an authorized request for a feed results in an HTTP 503 (Service Unavailable) response, with a message in the body of the response indicating that the specific account has insufficient quota to proceed. See the terms of service for more information. 
+
+
+
+
+  $report_opt = array(
+    'ids=' . $pid,
+    ga:bounces ga:entrances ga:exits
+    
+    'metrics=ga:pageviews',
+    'dimensions=ga:requestUri',
+    'filters=ga:requestUri%3D~%5E%2F2009%2F08',
+    'ga:requestUri=~^/2009/08',
+    'filters=ga:requestUri%3D~%5E' . urlencode('/e/2008/11/13/4371'),
+    'sort=ga:pageviews',
+    'start-date=2009-03-01',
+    'end-date=2009-03-31'
+  );
+*/
+

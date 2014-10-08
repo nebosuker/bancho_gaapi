@@ -1,0 +1,45 @@
+<?php
+// 日本語
+
+/**
+ * Display help and module information
+ * @param section which section of the site we're displaying help
+ * @return help text for section
+ */
+function bancho_gaapi_ranking_weekly_help($path, $arg) {
+  switch ($path) {
+    case 'admin/modules#description':
+      return 'Google Analyticsのデータを自動取得してランキング記事を作成';
+      break;
+  }
+}
+
+/**
+ * Implements hook_menu(). */
+function bancho_gaapi_ranking_weekly_menu() {
+
+  $items = array();
+
+  // ↓ノードタイプを登録してるわけじゃないからメニューで定義必要
+  $items['node/add/bancho_gaapi_ranking_weekly'] = array(
+    'title' => '週間ランキング記事の作成',
+    'description' => 'Google Analyticsのデータを自動取得してランキング記事を作成（またはnidを指定してランキング記事を作成）',
+    'page callback' => 'bancho_gaapi_ranking_weekly_main',
+    'file' => 'bancho_gaapi_ranking_weekly.inc',
+    'access arguments' => array('access bancho_gaapi'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  return $items;
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function bancho_gaapi_ranking_weekly_form_node_form_alter(&$form, &$form_state, $form_id) {
+  // 対象のときだけincファイルのルーチンを呼び出し
+  if (isset($form['#node']->bancho_gaapi_ranking_weekly)) {
+    module_load_include('inc', 'bancho_gaapi_ranking_weekly', 'bancho_gaapi_ranking_weekly');
+    bancho_gaapi_ranking_weekly_form_alter_main($form, $form_state, $form_id);
+  }
+}

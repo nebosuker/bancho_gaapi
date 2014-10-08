@@ -1,0 +1,478 @@
+<?php
+
+define('BANCHO_GAAPI_NUM_RANKINGS', 3);
+
+/** TODO
+ */
+
+
+/**
+ * Display help and module information
+ * @param section which section of the site we're displaying help
+ * @return help text for section
+ */
+function bancho_gaapi_help($path, $arg) {
+  switch ($path) {
+    case 'admin/modules#description':
+      return 'Google Analyticsのデータを自動取得';
+      break;
+  }
+}
+
+/**
+ * Valid permissions for this module
+ * @return array An array of valid permissions for the module
+ */
+function bancho_gaapi_permission() {
+  return array(
+    'administer bancho_gaapi' => array(
+      'title' => t('administer bancho_gaapi'),
+      'description' => t('TODO Add a description for \'administer bancho_gaapi\''),
+    ),
+    'access bancho_gaapi' => array(
+      'title' => t('access bancho_gaapi'),
+      'description' => t('TODO Add a description for \'access bancho_gaapi\''),
+    ),
+  );
+}
+
+/**
+ * Implements hook_menu().().
+ */
+function bancho_gaapi_menu() {
+
+  $items = array();
+
+  $items['admin/config/bancho/bancho_gaapi'] = array(
+    'title' => 'Google Analytics APIデータの管理',
+    'page callback' => 'bancho_gaapi_stub_settings',
+    'file' => 'bancho_gaapi.admin.inc',
+    'access arguments' => array('administer bancho_gaapi'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['admin/reports/bancho_gaapi/statistics'] = array(
+    'title' => 'アクセス解析データの統計',
+    'page callback' => 'bancho_gaapi_statistics_main',
+    'file' => 'bancho_gaapi.statistics.inc',
+    'access arguments' => array('access bancho_gaapi'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+
+  $items['admin/config/bancho/bancho_gaapi/update_ga_data'] = array(
+    'title' => '情報の手動アップデート',
+    'page callback' => 'bancho_gaapi_manual_update',
+    'file' => 'bancho_gaapi.admin.inc',
+    'access arguments' => array('administer bancho_gaapi'),
+    'type' => MENU_CALLBACK,
+  );
+
+  $items['rankings'] = array(
+    'title' => '人気記事ランキング',
+    'page callback' => 'bancho_gaapi_ranking_main',
+    'file' => 'bancho_gaapi.ranking.inc',
+    'access arguments' => array('access content'),
+    'type' => MENU_CALLBACK,
+  );
+
+  return $items;
+}
+
+
+/**
+ * Implements hook_theme()().
+ */
+function bancho_gaapi_theme() {
+  return array(
+    'bancho_gaapi_galink' => array(
+      'variables' => array(
+        'type' => NULL,
+        'nid' => NULL,
+        'created' => NULL,
+        'path' => NULL,
+        'anchor' => NULL,
+        'attributes' => array(),
+        'query' => NULL,
+        'fragment' => NULL,
+        'absolute' => FALSE,
+        'html' => FALSE
+      ),
+    ),
+    'bancho_gaapi_ranking' => array(
+      'variables' => array('view' => NULL, 'nodes' => NULL, 'type' => NULL),
+    ),
+  );
+}
+
+
+
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
+//function bancho_gaapi_link($type, $node = NULL, $teaser = FALSE) {
+function bancho_gaapi_node_view($node, $view_mode) {
+
+//  $status = variable_get('bancho_gaapi_profile_status', array());
+  if ($view_mode !== 'full' || !user_access('access bancho_gaapi')) {
+    return;
+  }
+
+  $links = array(
+    'bancho_gaapi'=> array(
+      '#links' => array(),
+      '#attributes' => array('links', 'inline')
+    )
+  );
+
+  $links['bancho_gaapi']['#links']['gaapi_stats']['html'] = TRUE;
+  $links['bancho_gaapi']['#links']['gaapi_stats']['title'] = sprintf(
+    '<br style="clear: left" /><strong>アクセス解析情報 from Google Analytics</strong> →%s%s%s', 
+    theme('bancho_gaapi_galink', array('type' => 'page', 'nid' => $node->nid, 'created' => $node->created, 'path' => NULL, 'anchor' => '調べる', 'attributes' => array('title' => 'このページの解析を表示する', 'style' => 'font-weight: normal'))), 
+    theme('bancho_gaapi_galink', array('type' => 'referrer', 'nid' => $node->nid, 'created' => $node->created)), 
+    theme('bancho_gaapi_galink', array('type' => 'keywords', 'nid' => $node->nid, 'created' => $node->created))
+  );
+
+  $ga = db_query_range('SELECT * FROM {bancho_gaapi} WHERE nid = :nid', 0, 1, array(':nid' => $node->nid))->fetchObject();
+  if ($ga) {
+
+    $total = $ga->total_pv;
+
+    // SBM数
+    if (db_table_exists('bancho_sbm_count')) {
+      $sbm = db_query('SELECT SUM(count) num FROM {bancho_sbm_count} WHERE nid = :nid', array(':nid' => $node->nid))->fetchObject();
+      // sNPSの類似平均（同ノードタイプ、前後1月内）
+      $snps_avg = db_query('SELECT ROUND((SUM(sbm.count) / SUM(ga.total_visits)) * 100, 2) FROM {node} n LEFT JOIN {bancho_sbm_count} sbm ON n.nid = sbm.nid LEFT JOIN {bancho_gaapi} ga ON n.nid = ga.nid WHERE n.type LIKE :type AND n.created > :created_min AND n.created < :created_max', array(':type' => $node->type, ':created_min' => $node->created - (86400 * 30), ':created_max' => $node->created + (86400 * 30)))->fetchField();
+    }
+    else {
+      $sbm = new stdClass();
+      $sbm->num = 0;
+      $snps_avg = 0;
+    }
+
+
+    $links['bancho_gaapi']['#links']['gaapi_stats']['title'] .= sprintf(
+      '<br />累積<span class="blur">%s</span>pv（<span class="blur">%s</span>訪問）、入口<span class="blur">%s</span>回 (直帰<span class="blur">%s</span>回、直帰率<span class="blur">%s</span>%%)、出口<span class="blur">%s</span>回 (離脱率<span class="blur">%s</span>%%)<br />初日<span class="blur">%s</span> (<span class="blur">%s</span>%%) → 7日<span class="blur">%s</span> (<span class="blur">%s</span>%%) → 14日<span class="blur">%s</span> (<span class="blur">%s</span>%%) → 30日<span class="blur">%s</span> (<span class="blur">%s</span>%%) → 90日<span class="blur">%s</span> (<span class="blur">%s</span>%%)<br />直近1日間 <span class="blur">%s</span>pv、直近7日間<span class="blur">%s</span>pv、直近30日間<span class="blur">%s</span>pv、<span class="blur">%s</span>pv増/7日、記事年齢 %s 日<br />sNPS：<span class="blur">%s</span> （全ソーシャル言及数÷ユニーク訪問数 同時期同記事タイプ平均は<span class="blur">%s</span>）', 
+      check_plain(number_format($ga->total_pv)), 
+      check_plain(number_format($ga->total_visits)), 
+      check_plain(number_format($ga->total_entrances)), 
+      check_plain(number_format($ga->total_bounces)), 
+      check_plain(round($ga->total_bounce_rate / 100, 1)), 
+      check_plain(number_format($ga->total_exits)), 
+      check_plain(round($ga->total_exit_rate / 100, 1)), 
+      $ga->total_day1_pv ?
+        check_plain(number_format($ga->total_day1_pv)) : '-', 
+      $ga->total_day1_pv && $total ?
+        check_plain(round($ga->total_day1_pv / $total * 100, 1)) : '-', 
+      $ga->total_1week_pv ?
+        check_plain(number_format($ga->total_1week_pv)) : '-', 
+      $ga->total_1week_pv && $total ?
+        check_plain(round($ga->total_1week_pv / $total * 100, 1)) : '-', 
+      $ga->total_2week_pv ?
+        check_plain(number_format($ga->total_2week_pv)) : '-', 
+      $ga->total_2week_pv && $total ?
+        check_plain(round($ga->total_2week_pv / $total * 100, 1)) : '-', 
+      $ga->total_1month_pv ?
+        check_plain(number_format($ga->total_1month_pv)) : '-', 
+      $ga->total_1month_pv && $total ?
+        check_plain(round($ga->total_1month_pv / $total * 100, 1)) : '-', 
+      $ga->total_3month_pv ?
+        check_plain(number_format($ga->total_3month_pv)) : '-', 
+      $ga->total_3month_pv && $total ?
+        check_plain(round($ga->total_3month_pv / $total * 100, 1)) : '-', 
+      $ga->total_last1day_pv ?
+        check_plain(number_format($ga->total_last1day_pv)) : '-', 
+      $ga->total_last7days_pv ?
+        check_plain(number_format($ga->total_last7days_pv)) : '-', 
+      $ga->total_last30days_pv ?
+        check_plain(number_format($ga->total_last30days_pv)) : '-', 
+      $ga->total_delta ?
+        check_plain(number_format($ga->total_delta)) : '-', 
+      round((REQUEST_TIME - $node->created) / 86400, 0), 
+      check_plain(number_format($ga->total_visits == 0 ? 0 : $sbm->num / $ga->total_visits * 100, 1)), 
+      check_plain(number_format($snps_avg, 1))
+    );
+  }
+
+
+  // ソーシャル定性反応チェック用リンク
+  $node_url = url("node/" . $node->nid, array('absolute' => TRUE));
+  $node_url_encoded = urlencode( $node_url );
+
+  $links['bancho_gaapi']['#links']['sbm']['html'] = TRUE;
+  $links['bancho_gaapi']['#links']['sbm']['title'] = sprintf(
+    '<p><strong>定性反応チェック：</strong><a href="http://realtime.search.yahoo.co.jp/search?p=%s&ei=UTF-8&sv=3">Facebook</a> | <a href="http://topsy.com/trackback?url=%s">Twitter</a> | <a href="http://b.hatena.ne.jp/entry/%s">はてな</a></p>', 
+    $node_url_encoded, 
+    $node_url_encoded, 
+    $node_url
+  );
+
+  $node->content['links'] = array_merge($node->content['links'], $links);
+  return $node;
+}
+
+
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
+function theme_bancho_gaapi_galink($variables) {
+  $type = $variables['type'];
+  $nid = $variables['nid'];
+  $created = $variables['created'];
+  $path = $variables['path'];
+  $anchor = $variables['anchor'];
+  $attributes = $variables['attributes'];
+  $query = $variables['query'];
+  $fragment = $variables['fragment'];
+  $absolute = $variables['absolute'];
+  $html = $variables['html'];
+
+  static $profile_info;
+  if (!isset($profile_info)) {
+    // ここではbancho_gaapi_profile_infoは使えない
+    $profile_info = variable_get("bancho_gaapi_profile_info_current", array());
+  }
+  if (!isset($profile_info['account_id']) || !isset($profile_info['property_id']) || !isset($profile_info['profile_id'])) {
+    return '';
+  }
+  $profile_info['awp'] = sprintf(
+    'a%dw%dp%d', 
+    $profile_info['account_id'], 
+    $profile_info['property_id'], 
+    $profile_info['profile_id']
+  );
+
+
+  static $today;
+  if (!isset($today)) {
+    $today = date("Ymd");
+  }
+
+  if (!is_numeric($nid)) {
+    return "";
+  }
+
+  if (empty($created)) {
+    $created = db_query_range('SELECT created FROM {node} WHERE nid = :nid', 0, 1, array(':nid' => $nid))->fetchField();
+  }
+  if (empty($path)) {
+    $path = explode('/', drupal_get_path_alias('node/' . $nid));
+    foreach ($path as $key => $value) {
+      // URLエンコードされた情報へのリンクなので二重でエンコードする
+      $path[$key] = urlencode(urlencode($value));
+    }
+    $path = implode('/', $path);
+  }
+
+
+  // https://groups.google.com/forum/#!msg/google-analytics-management-api/NrMuQqTam40/nJFGGFLTyEoJ
+  // a = the account ID
+  // w = the internal web property id (found in the new version of the API)
+  // p = the profile ID
+  // 
+  // http://code.google.com/apis/analytics/docs/concepts/gaConceptsAccounts.html#webProperty
+
+
+  switch ($type) {
+    case 'page':
+      if (empty($anchor)) {
+        $anchor = db_query('SELECT title FROM {node} WHERE nid = :nid', array(':nid' => $nid, '' => 0, '' => 1))->fetchField();
+        $html = FALSE;
+      }
+
+      $link = l(
+        $anchor, 
+        sprintf(
+          'https://www.google.com/analytics/web/#report/content-pages/%s/%%3F_.date00%%3D%s%%26_.date01%%3D%s%%26explorer-table.filter%%3D%s/', 
+          $profile_info['awp'], 
+          date("Ymd", $created), 
+          $today, 
+          urlencode(base_path() . $path)
+        ), 
+        array(
+          'attributes' => (is_array($attributes) && count($attributes) > 0 ? $attributes : array('title' => 'この記事のアクセス解析ページを表示')),
+          'query' => $query,
+          'fragment' => $fragment,
+          'absolute' => $absolute,
+          'html' => $html,
+        )
+      );
+      break;
+
+    case 'referrer':
+      if (empty($anchor)) {
+        // https://www.google.com/analytics/reporting/content?id=820928のアイコン
+        $anchor = '<img src="' . base_path() . drupal_get_path('module', 'bancho_gaapi') . '/img/icon_source.png" style="vertical-align: bottom" width="19" height="19" alt="参照元" class="inline lazyload" />';
+        $html = TRUE;
+      }
+      $link = l(
+      $anchor, 
+
+        sprintf(
+          'https://www.google.com/analytics/web/#report/trafficsources-all-traffic/%s/%%3F_u.date00%%3D%s%%26_u.date01%%3D%s%%26_.sampleSize%%3D500000%%26explorer-table.secSegmentId%%3Danalytics.landingPagePath%%26explorer-table.plotKeys%%3D[]%%26explorer-table.advFilter%%3D[[0%%2C%%22analytics.landingPagePath%%22%%2C%%22BW%%22%%2C%%22%s%%22%%2C0]]%%26explorer-table.rowStart%%3D0%%26explorer-table.rowCount%%3D50/', 
+          $profile_info['awp'], 
+          date("Ymd", $created), 
+          $today, 
+          urlencode(base_path() . $path)
+        ), 
+
+//        sprintf(
+//          'https://www.google.com/analytics/web/#report/content-landing-pages/%s/%%3F_.date00%%3D%s%%26_.date01%%3D%s%%26explorer-table.secSegmentId%%3Danalytics.landingPagePath%%26explorer-table.advFilter%%3D[[0%%2C%%22analytics.landingPagePath%%22%%2C%%22PT%%22%%2C%%22%s%%22%%2C0]]%%26explorer-table.rowStart%%3D0%%26explorer-table.rowCount%%3D100%%26explorer-segmentExplorer.segmentId%%3Danalytics.source/',
+//          $profile_info['awp'],
+//          date("Ymd", $created),
+//          $today,
+//          urlencode(base_path() . $path)
+//        ),
+
+      array(
+        'attributes' => (is_array($attributes) && count($attributes) > 0 ? $attributes : array(
+          'title' => 'この記事の参照元を解析',
+          'style' => 'padding: 0 0 0 4px',
+        )),
+        'query' => $query,
+        'fragment' => $fragment,
+        'absolute' => $absolute,
+        'html' => $html,
+      )
+    );
+      break;
+
+    case 'keywords':
+      if (empty($anchor)) {
+        // https://www.google.com/analytics/reporting/content?id=820928のアイコン
+        $anchor = '<img src="' . base_path() . drupal_get_path('module', 'bancho_gaapi') . '/img/icon_kw.png" style="vertical-align: bottom" width="19" height="19" alt="参照元" class="inline lazyload" />';
+        $html = TRUE;
+      }
+      $link = l(
+      $anchor, 
+      sprintf(
+        'https://www.google.com/analytics/web/#report/content-landing-pages/%s/%%3F_.date00%%3D%s%%26_.date01%%3D%s%%26explorer-table.secSegmentId%%3Danalytics.landingPagePath%%26explorer-table.advFilter%%3D[[0%%2C%%22analytics.landingPagePath%%22%%2C%%22PT%%22%%2C%%22%%2Fe%%2F2014%%2F01%%2F28%%2F16837%%22%%2C0]%%2C[0%%2C%%22analytics.keyword%%22%%2C%%22EQ%%22%%2C%%22%%28not%%20set%%29%%22%%2C1]%%2C[0%%2C%%22analytics.keyword%%22%%2C%%22EQ%%22%%2C%%22%%28not%%20provided%%29%%22%%2C1]]%%26explorer-table.rowStart%%3D0%%26explorer-table.rowCount%%3D100%%26explorer-segmentExplorer.segmentId%%3Danalytics.keyword/', 
+        $profile_info['awp'], 
+        date("Ymd", $created), 
+        $today, 
+        urlencode(base_path() . $path)
+      ), 
+      array(
+        'attributes' => (is_array($attributes) && count($attributes) > 0 ? $attributes : array(
+          'title' => 'この記事の参照キーワードを解析',
+          'style' => 'padding: 0 0 0 4px',
+        )),
+        'query' => $query,
+        'fragment' => $fragment,
+        'absolute' => $absolute,
+        'html' => $html,
+      )
+    );
+      break;
+  }
+
+  return $link;
+}
+
+
+
+/**
+ * Elysia cron用
+ */
+function bancho_gaapi_cronapi($op, $job = NULL) {
+  switch($op) {
+  case 'list':
+    $items['bancho_gaapi_cron'] = array(
+      'description' => 'Pull data from GA core reporting API (use background process when available)',
+    );
+    return $items;
+    break;
+  }
+}
+/**
+ * Implements hook_cron(). */
+function bancho_gaapi_cron() {
+  $suspend_until = variable_get('bancho_gaapi_suspend_cronrun_until', 0);
+  if (REQUEST_TIME > $suspend_until || $suspend_until > REQUEST_TIME + 3600) {
+    variable_del('bancho_gaapi_suspend_cronrun_until');
+//    cache_clear_all('variables', 'cache');
+    if (function_exists('background_process_start')) {
+      $cron_funcname = 'bancho_gaapi_cronmain';
+      $handle = background_process_start($cron_funcname);
+      watchdog('bancho', 'started background process ' . $cron_funcname . ' crontask. handle is: ' . check_plain($handle));
+    }
+    else {
+      $cron_funcname();
+    }
+  }
+}
+
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
+function bancho_gaapi_cronmain() {
+  module_load_include('inc', 'bancho_gaapi', 'gaapi_core');
+  bancho_gaapi_do_infoupdate();
+  bancho_gaapi_do_rankingupdate();
+
+  if (function_exists('background_process_start')) {
+    $cron_funcname = 'bancho_gaapi_cronmain';
+    watchdog('bancho', 'finished background process ' . $cron_funcname . ' crontask.');
+  }
+}
+
+
+/**
+ * Implements hook_gaapi_ranking().
+ *@param $action
+ * list|update
+ *@param $name
+ * name of the function
+ *@param $option
+ * which score to update
+ *@return
+ *
+ */
+function bancho_gaapi_gaapi_ranking($action = 'list', $name = FALSE, $option = FALSE) {
+
+  module_load_include('inc', 'bancho_gaapi', 'bancho_gaapi.ranking_methods');
+  return bancho_gaapi_gaapi_ranking_main($action, $name, $option);
+}
+
+
+/**
+ * Implements hook_form_alter().
+ * sample for ranking plugin
+ */
+function bancho_gaapi_form_alter(&$form, &$form_state, $form_id) {
+  if ($form_id != 'bancho_gaapi_settings_account') {
+    return;
+  }
+  module_load_include('inc', 'bancho_gaapi', 'bancho_gaapi.admin');
+  bancho_gaapi_form_alter_main($form, $form_state, $form_id);
+}
+/**
+ * Implements submit function called from form submission().
+ */
+function bancho_gaapi_form_alter_submit($form, &$form_state) {
+  module_load_include('inc', 'bancho_gaapi', 'bancho_gaapi.admin');
+  bancho_gaapi_form_alter_submit_main($form, $form_state);
+}
+
+/**
+ * @todo Please document this function.
+ * @see http://drupal.org/node/1354
+ */
+function bancho_gaapi_diminishing_ranking_default_array() {
+  return array(
+    'decrease_if_old_enough' => 1209600,
+    'decrease_every' => 1209600,
+    'decrease_rate' => 40,
+  );
+}
+
+/**
+ * Implements hook_views_api().().
+ */
+function bancho_gaapi_views_api() {
+  return array(
+    'api' => 2,
+  );
+}
