@@ -4,7 +4,7 @@
  * 統計出力用
  */
 // GA API用コード読み込み
-module_load_include('inc', 'statistics', 'gaapi_core');
+module_load_include('inc', 'bancho_gaapi', 'gaapi_core');
 
 define('BANCHO_GAAPI_STATS_RPP', 50);
 
@@ -109,7 +109,20 @@ function bancho_gaapi_statistics_main() {
     $s .= drupal_render($form);
   }
 
-  return $s;
+  $content_array = array(
+    '#type' => 'markup',
+    '#markup' => $s,
+  );
+  
+
+  // jquery.table_colorscaleがあれば使う
+  $colorscale_path = drupal_get_path('module', 'bancho_gaapi') . '/jquery.table_colorscale/jquery.table_colorscale.js';
+  if (file_exists(realpath($colorscale_path))) {
+    $content_array['#attached']['js'][$colorscale_path] = array('preprocess' => FALSE);
+    $content_array['#attached']['js'][drupal_get_path('module', 'bancho_gaapi') . '/bancho_gaapi.statistics.js'] = array('preprocess' => FALSE);
+  }
+
+  return $content_array;
 }
 
 
@@ -431,7 +444,7 @@ function bancho_gaapi_statistics_data($target = FALSE) {
 
 
   // 筆者ノード指定での絞り込み（uid）
-  if (!empty($_GET['users_uids'])) {
+  if (!empty($_GET['users_uids']) || $_GET['users_uids'] === '0') {
     $query->leftJoin('users', 'uq', 'uq.uid = n.uid');
     $or_e = db_or();
     foreach ((array) $_GET['users_uids'] as $uid) {
@@ -583,7 +596,7 @@ function bancho_gaapi_statistics_data($target = FALSE) {
 
 
   if (count($title_appendix)) {
-    drupal_set_title(drupal_set_title() . '：<br />' . implode(' | ', $title_appendix));
+    drupal_set_title(drupal_set_title() . "：\n" . implode(' | ', $title_appendix));
   }
 
 
@@ -719,11 +732,11 @@ function bancho_gaapi_statistics_data($target = FALSE) {
 
   $queryRows = $queryTableSort
     ->extend('PagerDefault')
-    ->limit(((!empty($_GET['page']) && $_GET['page'] == 'full') || (arg(5)=='page' && arg(6) == 'full')) ? 65535 : BANCHO_GAAPI_STATS_RPP);
+    ->limit((!empty($_GET['nopaging']) || arg(5)=='nopaging') ? 65535 : BANCHO_GAAPI_STATS_RPP);
 
   $queryRows->distinct();
 
-//dpm($queryRows->__toString());
+//watchdog('bancho_debug', '$query=%query', array('%query'=>$queryRows->__toString()));
 
   $db_res = $queryRows->execute();
 
@@ -815,6 +828,7 @@ function bancho_gaapi_statistics_data($target = FALSE) {
     }
     elseif ($target === 'users' || $target == 'editors' || $target == 'planners') {
       // 筆者ごと・担当者ごと・企画者ごとの場合
+/*
       if ($row->itemId == 0) {
         $item['name']['data'] = '匿名';
       }
@@ -841,6 +855,36 @@ function bancho_gaapi_statistics_data($target = FALSE) {
             'html' => TRUE
           )
         );
+        $item['name']['data'] .=' [' . l('?', $detaiL_url_prefix . $row->itemId, array('attributes' => array('title' => 'このユーザーの情報を確認'))) . ']';
+      }
+*/
+      $query_name = $target;
+      if ($row->itemId == 0) {
+        $query_name .= '_uids';
+        $detaiL_url_prefix = FALSE;
+      }
+      elseif (!empty($row->itemId_na)) {
+        $query_name .= '_nids';
+        $detaiL_url_prefix = 'node/';
+      }
+      elseif (!empty($row->itemId_nau)) {
+        $query_name .= '_nids';
+        $detaiL_url_prefix = 'node/';
+      }
+      elseif (!empty($row->itemId_u)) {
+        $query_name .= '_uids';
+        $detaiL_url_prefix = 'user/';
+      }
+      $item['name']['data'] = l(
+        ($row->itemId == 0 ? '匿名' :($realname ? check_plain($realname) : ($row->name ? check_plain($row->name) : 'uid:' . $row->itemId))) . theme('image', array('path' => 'misc/arrow-asc.png')),
+        'admin/reports/bancho_gaapi/statistics/nodes',
+        array(
+          'attributes' => array('title' => 'このユーザーに限定して記事単位のアクセス数を確認'),
+          'query' => array_merge(array($query_name => $row->itemId), (!empty($_GET['options']) ? array('options' => $_GET['options']) : array())),
+          'html' => TRUE
+        )
+      );
+      if ($row->itemId != 0) {
         $item['name']['data'] .=' [' . l('?', $detaiL_url_prefix . $row->itemId, array('attributes' => array('title' => 'このユーザーの情報を確認'))) . ']';
       }
     }
@@ -926,14 +970,16 @@ function bancho_gaapi_statistics_data($target = FALSE) {
       }
     }
     $queryStats->addExpression('count(DISTINCT(n.nid))', 'num');
-    $queryStats->addExpression('SUM(ga.total_pv)', 'pv_total');
-    $queryStats->addExpression('SUM(ga.total_2week_pv)', 'pv_initial');
+    $queryStats->addExpression('SUM(DISTINCT(ga.total_pv))', 'pv_total');
+    $queryStats->addExpression('SUM(DISTINCT(ga.total_2week_pv))', 'pv_initial');
     $queryStats->addExpression('SUM(UNIX_TIMESTAMP() - n.created)', 'node_age');
     $queryStats->condition($conditions);
 // statsuにgroupbyは不要
 //    foreach ($groupBy as $groupByItem) {
 //      $queryStats->groupBy($groupByItem);
 //    }
+
+//watchdog('bancho_debug', '$queryStats=%query', array('%query'=>$queryStats->__toString()));
 
     $statRow = $queryStats->execute()->fetchObject();
 
@@ -964,7 +1010,7 @@ function bancho_gaapi_statistics_data($target = FALSE) {
     $s = '';
     global $pager_total, $pager_total_items;
     if ($pager_total[0] > 1 && $pager_total_items[0] < 250) {
-      $s .= '<div style="text-align: center">' . l('ページネーションなしで表示', $_GET['q'], array('query' => array_merge(array('page'=>'full'), drupal_get_query_parameters($_GET, array('q', 'page'))))) . '</div>';
+      $s .= '<div style="text-align: center">' . l('ページネーションなしで表示', arg(0) . '/'.arg(1).'/'.arg(2).'/'.arg(3).'/'.arg(4).'/nopaging', array('query' => drupal_get_query_parameters($_GET, array('q', 'page')))) . '</div>';
     }
     elseif (!empty($_GET['page']) && $_GET['page'] == 'full') {
       $s .= '<div style="text-align: center">' . l('ページネーションありで表示', $_GET['q'], array('query' => drupal_get_query_parameters($_GET, array('q', 'page')))) . '</div>';
@@ -1034,7 +1080,8 @@ function bancho_gaapi_statistics_data($target = FALSE) {
 
   // オプションのフォーム
   $form = drupal_get_form('bancho_gaapi_statistics_form');
-//  return '<p>'.l('アクセス解析メニューに戻る', 'admin/reports/bancho_gaapi/statistics') . '</p>' . $form . $s;
+
+
   return drupal_render($form) . $s;
 }
 
@@ -1078,34 +1125,35 @@ function bancho_gaapi_get_tableheader($url, $target){
   );
   if ($target !== 'nodes'){
     $tableheader['data'][] = bancho_gaapi_get_tableheader_list_helper(
-      'num', '記事数', $key, $order, $url, $query, array('style'=>'text-align: center')
+      'num', '記事数', $key, $order, $url, $query, array('class'=>array('bancho_gaapi_statistics_data'), 'style'=>'text-align: center')
     );
   }
   $tableheader['data'][] = bancho_gaapi_get_tableheader_list_helper(
-    'pv_initial_avg', ($target == 'nodes' ? '' : '平均').'pv<br /><span style="font-size: 0.8em">(公開後<br />14日)</span>', $key , $order, $url, $query, array('style'=>'text-align: center')
+    'pv_initial_avg', ($target == 'nodes' ? '' : '平均').'pv<br /><span style="font-size: 0.8em">(公開後<br />14日)</span>', $key , $order, $url, $query, array('class'=>array('bancho_gaapi_statistics_data'), 'style'=>'text-align: center')
   );
   $tableheader['data'][] = bancho_gaapi_get_tableheader_list_helper(
-    'pv_total_avg', ($target == 'nodes' ? '' : '平均').'pv<br /><span style="font-size: 0.8em">(累計)</span>', $key, $order, $url, $query, array('style'=>'text-align: center')
+    'pv_total_avg', ($target == 'nodes' ? '' : '平均').'pv<br /><span style="font-size: 0.8em">(累計)</span>', $key, $order, $url, $query, array('class'=>array('bancho_gaapi_statistics_data'), 'style'=>'text-align: center')
   );
   $tableheader['data'][] = bancho_gaapi_get_tableheader_list_helper(
-    'visits_total_avg', ($target == 'nodes' ? '' : '平均').'visit<br /><span style="font-size: 0.8em">(累計)</span>', $key, $order, $url, $query, array('style'=>'text-align: center')
+    'visits_total_avg', ($target == 'nodes' ? '' : '平均').'visit<br /><span style="font-size: 0.8em">(累計)</span>', $key, $order, $url, $query, array('class'=>array('bancho_gaapi_statistics_data'), 'style'=>'text-align: center')
   );
   if ($target !== 'nodes'){
     $tableheader['data'][] = bancho_gaapi_get_tableheader_list_helper(
-      'pv_total', '累計pv', $key, $order, $url, $query, array('style'=>'text-align: center')
+      'pv_total', '累計pv', $key, $order, $url, $query, array('class'=>array('bancho_gaapi_statistics_data'), 'style'=>'text-align: center')
     );
   }
   $tableheader['data'][] = bancho_gaapi_get_tableheader_list_helper(
-    'node_age_avg', ($target == 'nodes' ? '' : '平均<br />').'記事<br />年齢<span style="font-size: 0.8em">（日）</span>', $key, $order, $url, $query, array('style'=>'text-align: center')
+    'node_age_avg', ($target == 'nodes' ? '' : '平均<br />').'記事<br />年齢<span style="font-size: 0.8em">（日）</span>', $key, $order, $url, $query, array('class'=>array('bancho_gaapi_statistics_data'), 'style'=>'text-align: center')
   );
   $tableheader['data'][] = bancho_gaapi_get_tableheader_list_helper(
-    'pv_total_delta', 'pv増加数<sup style="color: #660000">※</sup>', empty($key) ? 'pv_total_delta' : $key, $order, $url, $query, array('style'=>'text-align: center')
+    'pv_total_delta', 'pv増加数<sup style="color: #660000">※</sup>', empty($key) ? 'pv_total_delta' : $key, $order, $url, $query, array('class'=>array('bancho_gaapi_statistics_data'), 'style'=>'text-align: center')
   );
   if ($target !== 'nodes'){
     $tableheader['data'][] = array(
       'header'=>1,
       'data'=>'キー<br />値の<br />標準<br />偏差',
-      'style'=>'text-align: center'
+      'style'=>'text-align: center',
+      'class'=>array('bancho_gaapi_statistics_data'), 
     );
   }
   return $tableheader;
@@ -1256,6 +1304,36 @@ function bancho_gaapi_statistics_form($form, &$form_state) {
       '#value' => empty($_GET['uid']) ? '' : $_GET['uid'],
     );
   }
+  if (isset($_GET['uids'])) {
+    $form['uids'] = array(
+      '#type' => 'hidden',
+      '#value' => empty($_GET['uids']) ? '' : $_GET['uids'],
+    );
+  }
+  if (isset($_GET['users_uids'])) {
+    $form['users_uids'] = array(
+      '#type' => 'hidden',
+      '#value' => empty($_GET['users_uids']) ? '' : $_GET['users_uids'],
+    );
+  }
+  if (isset($_GET['users_nids'])) {
+    $form['users_nids'] = array(
+      '#type' => 'hidden',
+      '#value' => empty($_GET['users_nids']) ? '' : $_GET['users_nids'],
+    );
+  }
+  if (isset($_GET['editors_uids'])) {
+    $form['editors_uids'] = array(
+      '#type' => 'hidden',
+      '#value' => empty($_GET['editors_uids']) ? '' : $_GET['editors_uids'],
+    );
+  }
+  if (isset($_GET['planners_uids'])) {
+    $form['planners_uids'] = array(
+      '#type' => 'hidden',
+      '#value' => empty($_GET['planners_uids']) ? '' : $_GET['planners_uids'],
+    );
+  }
   if (isset($_GET['key'])) {
     $form['key'] = array(
       '#type' => 'hidden',
@@ -1394,7 +1472,7 @@ function bancho_gaapi_cleanup_params_check($k, $v) {
     }
   }
   else {
-    if (empty($v)) {
+    if (empty($v) && $v !== '0') {
       $need_redirect = TRUE;
     }
     else {

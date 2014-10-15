@@ -3,8 +3,8 @@ description = Google Analytics Data API utilizer
 package = "bancho"
 core = 7.x
 
-version = "7.x-1.2"
-datestamp = "1407735012"
+version = "7.x-1.3"
+datestamp = "1413374702"
 
 ;dependencies[] = bancho_common_functions
 
