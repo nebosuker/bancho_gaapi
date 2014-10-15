@@ -1,6 +1,16 @@
+■TODO
 
-http://analytics.blogspot.com/2011/12/introducing-google-analytics-core.html
-http://code.google.com/apis/analytics/docs/gdata/home.html
+bancho_gaapi_table_data()を、おかしなTSVデータでの保持じゃなく、tempテーブルで処理するやり方に変える
+
+bancho_gaapi_is_this_node_url()でurl aliasをローカルで全部保持して処理しているのも、多少は時間を犠牲にしてでも、tempテーブルなどに置き換える
+
+→すべて、background_processを前提にして作るべき
+→dependencyも付けるべきかも
+
+
+■DONE
+
+・D7対応
 
 ・OAuth対応
 PECLのOAuthを使うか、abraham http://github.com/abraham/twitteroauth のOAuth.phpを使うか
@@ -9,7 +19,13 @@ PECLのOAuthを使うか、abraham http://github.com/abraham/twitteroauth のOAu
 
 impressrd	Web担当者Forum	820928	ga:820928
 
-/*
+
+■memo
+
+
+http://analytics.blogspot.com/2011/12/introducing-google-analytics-core.html
+http://code.google.com/apis/analytics/docs/gdata/home.html
+
 
 http://code.google.com/intl/ja/apis/analytics/docs/gdata/gdataDeveloperGuide.html
 http://code.google.com/intl/ja/apis/analytics/docs/gdata/gdataReferenceDimensionsMetrics.html
@@ -57,5 +73,4 @@ When an account has exceeded its quota, an authorized request for a feed results
     'start-date=2009-03-01',
     'end-date=2009-03-31'
   );
-*/
 
