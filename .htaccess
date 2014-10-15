@@ -1,0 +1,4 @@
+<FilesMatch "\.(txt|bak|bak2|inc)|INSTALL">
+Order Deny,Allow
+Deny from All
+</FilesMatch>
